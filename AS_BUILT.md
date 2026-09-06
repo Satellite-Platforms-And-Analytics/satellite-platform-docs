@@ -57,6 +57,7 @@ quiet. None was a hard problem.
 | `main.py` left interactive instead of refactored | Building `visibility/compute.py` alongside it was cheaper and safer than making one 586-line script serve an analyst and a cron | ✅ The analyst tool still works, untouched |
 | `upsert_imagery_scene` still per-row | One scene per call. Batching it would be noise | ✅ Comment in the code says not to "fix" it |
 | `validate_taxonomy()` warns rather than asserts | A hard assert would kill the 2-hourly ingestion over a data-quality issue | ✅ Non-zero exit in CI, warning at runtime |
+| Not using Supabase's own GitHub integration | It auto-applies migrations on push to main. With no preview database — branching is the paid tier, and the roadmap commits to $0/month — a schema change would reach the only database with nobody having read it. `apply_migration.py` prints the statements first, and that review step is the thing being traded away. Evaluated 2026-09-05 | ✅ Free on any plan, so cost was not the reason; the missing preview was |
 | Hourly propagation, not 5-minutely | 5-minute resolution costs the entire tier and 6.5× the CI budget, and shared runners do not fire that often anyway | ✅ The globe propagates client-side instead |
 
 ---
@@ -164,6 +165,33 @@ stopped being published.
 `rcs_size` is silently a statement about pre-2020 objects. If sensor
 detection modelling in the Visibility Tool uses size, it has no data for
 the majority of what is currently in orbit.
+
+---
+
+## 7c. Found by evaluating something we then declined
+
+Assessing the Supabase GitHub integration meant asking a question nobody
+had asked: **can these migrations be applied twice?**
+
+They could not. `001_core_schema.sql` had six `CREATE POLICY` statements
+with no preceding `DROP POLICY IF EXISTS`, and `CREATE POLICY` has no
+`IF NOT EXISTS` form — so a second application fails partway, after
+earlier statements have already taken effect. 006 was written with the
+drops; 001 predated the habit and nothing ever re-ran it.
+
+The schema directory is the only description of how to rebuild this
+database, and that claim was quietly false. It would have surfaced on a
+fresh project, a staging copy, or a restore — the three moments when it
+is least welcome.
+
+Fixed in 001, and `tests/test_migrations_idempotent.py` now checks all 91
+statements across every migration on each CI run. It reuses
+`split_statements` from `apply_migration.py` rather than reimplementing
+it, so the two cannot disagree about where a statement ends.
+
+**Rule derived:** evaluating a tool you end up rejecting is not wasted
+work. The question it forces you to ask about your own setup is often
+worth more than the tool.
 
 ---
 
