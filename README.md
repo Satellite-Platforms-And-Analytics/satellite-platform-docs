@@ -22,6 +22,30 @@ The guide alone reads as though the order were obvious; it was not.
 
 ---
 
+## Working rule: never run git through the remote bridge
+
+**Do not run `git` — not even `git status` — against these repositories
+from a Claude session's bridge shell.** Git takes `.git/index.lock` and
+the bridge mount cannot unlink it, so every invocation strands a lock
+file that only a human at the machine can remove. Even a folder-wide
+delete grant does not reach inside `.git/`.
+
+This has happened three times: 2026-09-04 twice, and again on 2026-09-05
+running `git status` to build a commit list. It was written down after
+the first two and repeated anyway, which is why it is here at the front
+door rather than in the history.
+
+If a lock is stranded:
+
+```
+del D:\Projects\Satellite-Platform\<repo>\.git\index.lock
+```
+
+Claude should report file state from `ls` and the filesystem, and hand
+over git commands for a human to run.
+
+---
+
 ## The other repositories
 
 | Repo | Contains |

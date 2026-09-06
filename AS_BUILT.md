@@ -108,9 +108,22 @@ Seven instances of one bug, across unrelated subsystems:
 | 5 | Sensor registry | `SENSOR_PROFILES` and the `sensors` table drifted; neither noticed |
 | 6 | `except ImportError: pass` | Hid the one import failure that mattered |
 | 7 | `pytest.skip` on a missing schema | The only schema-drift guard, skipping inside a green build |
+| 8 | `apply_migration.py`'s preview | Split SQL on every `;`, including inside string literals and `$$ … $$`. Showed `prune_old_positions()` as five invalid fragments |
 
 **Common form:** configuration naming something the world does not have,
 paired with a fallback that makes the absence look like success.
+
+Number 8 is a variant worth naming separately: **the safety feature whose
+output looks right and is not.** The runner's own docstring says "a
+migration you cannot read before it executes is one you are trusting
+rather than reviewing" — and then printed something other than what it
+ran. Nothing broke, because execution sends the whole file in one
+transaction and never touches the split. But the preview *is* the review
+step, so for `001_core_schema.sql` the review has been reading five
+invalid fragments in place of a plpgsql function since July.
+
+Fixed with a quote-, comment- and dollar-quote-aware splitter plus
+`python apply_migration.py --self-test`, which needs no database.
 
 **Remedy, every time:** make the assumption checkable and fail loudly.
 `--check-groups`, `validate_taxonomy()`, `REQUIRE_SCHEMA=1`, the arity
@@ -133,17 +146,39 @@ is ten minutes and it is the difference between resuming and re-deriving.
 
 ---
 
+## 7b. Data that is present but not usable
+
+Worth its own note, because a populated column reads as a usable one.
+
+**`rcs_size` is a legacy field.** SATCAT publishes radar cross section for
+87–91% of on-orbit payloads launched between the 1960s and 2000s, 53.8%
+of the 2010s, and **0% of the 2020s** — not one of 15,569. Starlink,
+OneWeb and the Chinese megaconstellations are all zero.
+
+The catalogue therefore enriched to 9.6% `rcs_size` coverage, and that
+number is correct rather than a failure: it skews to recent launches, and
+recent launches have no RCS. No alternative source fixes this; the field
+stopped being published.
+
+**Consequence:** any grouping, filtering or detection model keyed on
+`rcs_size` is silently a statement about pre-2020 objects. If sensor
+detection modelling in the Visibility Tool uses size, it has no data for
+the majority of what is currently in orbit.
+
+---
+
 ## 8. Still open
 
 | | Since |
 |---|---|
 | 🔲 PAVE PAWS in `SENSOR_PROFILES` but not the `sensors` table | 09-01 |
-| 🔲 `test_writer_columns.py` covers `001_core_schema.sql` only — Phase 2 adds `004` | 09-04 |
+| ✅ `test_writer_columns.py` now reads `ADD COLUMN` from every migration — caught `owner_code` on sight | 09-05 |
 | 🔲 `check_pipeline.py` does not exit non-zero on a stale pipeline, so it cannot be a canary | 09-04 |
 | 🔲 `visibility_windows` retention at 3 days; budget now allows 5 | 09-04 |
 | 🔲 `_to_delete/` — 1.5 GB awaiting review | 08-30 |
 | 🔲 Clicking a satellite should link to the analysis domain (AD-034) | 09-04 |
 | 🔲 `check2.py` at the repo root — unexplained, undocumented | unknown |
+| 🔲 `insert_tle_history` uses `ON CONFLICT DO NOTHING` but `_bulk_upsert` returns rows *submitted*, so every `ingestion_log` "written" figure for tle_history counts rows the database silently discarded. Fixable now that `count_affected=True` exists | 09-05 |
 
 ---
 
