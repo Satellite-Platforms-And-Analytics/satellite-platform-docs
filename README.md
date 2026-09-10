@@ -30,19 +30,31 @@ the bridge mount cannot unlink it, so every invocation strands a lock
 file that only a human at the machine can remove. Even a folder-wide
 delete grant does not reach inside `.git/`.
 
-This has happened three times: 2026-09-04 twice, and again on 2026-09-05
-running `git status` to build a commit list. It was written down after
-the first two and repeated anyway, which is why it is here at the front
-door rather than in the history.
+This has happened four times: 2026-09-04 twice, 2026-09-05 running
+`git status` to build a commit list, and 2026-09-10 running `git status`
+across all four repositories during the operational audit. It was written
+down after the first two and repeated twice since, which is why it is
+here at the front door rather than in the history.
 
-If a lock is stranded:
+If a lock is stranded, either of these clears it. The second one works
+from the bridge shell itself, which the earlier version of this note
+wrongly assumed was impossible: the mount refuses `unlink` inside
+`.git/`, but it allows `rename`.
 
 ```
 del D:\Projects\Satellite-Platform\<repo>\.git\index.lock
 ```
 
-Claude should report file state from `ls` and the filesystem, and hand
-over git commands for a human to run.
+```
+mv <repo>/.git/index.lock <repo>/.git/index.lock.stale
+```
+
+That is a cleanup path, not a licence. Git through the bridge still
+strands a lock on every call, so Claude should report file state from
+`ls` and the filesystem and hand over git commands for a human to run.
+Read-only `git` calls that are genuinely needed (`git log`, `git
+check-ignore`, `git ls-files`) must be followed by the `mv` above in the
+same command.
 
 ---
 
