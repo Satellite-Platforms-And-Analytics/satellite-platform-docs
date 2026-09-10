@@ -46,6 +46,30 @@ over git commands for a human to run.
 
 ---
 
+## Checking CI status
+
+GitHub renders pass/fail as an icon with no text equivalent, and the
+badge is an SVG. Anything that reads the rendered page — including an
+agent fetching it — will report a conclusion it cannot actually see. On
+2026-09-05 that produced a confident "CI passed" for a run that had
+failed; the API showed `failure` for the same run.
+
+Ask the API, which returns the conclusion as literal text:
+
+```powershell
+$r = "https://api.github.com/repos/Satellite-Platforms-And-Analytics/satellite-platform-ingestion/actions/workflows/ci.yml/runs?per_page=8"
+(Invoke-RestMethod $r).workflow_runs |
+  Select-Object run_number, @{n='sha';e={$_.head_sha.Substring(0,7)}}, conclusion, display_title |
+  Format-Table -AutoSize
+```
+
+Swap `ci.yml` for `monitor_catalog.yml`, `enrich_catalog.yml`,
+`ingest_tle.yml`, `ingest_visibility.yml` or `propagate.yml` for the
+others. Unauthenticated calls are rate-limited per IP (60/hour), which is
+enough for this and is why a shared or proxied address may get a 403.
+
+---
+
 ## The other repositories
 
 | Repo | Contains |
