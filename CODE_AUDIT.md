@@ -62,7 +62,8 @@ monitor workflow installs numpy for a job that only reads the database.
 
 ---
 
-## 3. requirements.txt lists nine packages nothing imports
+## 3. requirements.txt lists ten packages nothing imports — and omits four it needs  
+_Status: **resolved 2026-09-10**, see the note at the end of this section._
 
 Checked every entry against actual imports:
 
@@ -77,9 +78,26 @@ Checked every entry against actual imports:
 | xarray | **nothing** |
 | alembic | **nothing** |
 | apscheduler | **nothing** |
+| pytest-asyncio | **nothing** — there is not one async test in the repository |
 
 `ruff` and `mypy` are tools rather than imports and are legitimate.
 `rasterio` **is** imported, by `src/imagery/ingest.py`.
+
+The list was also wrong in the other direction, which the first pass
+missed. Four packages that `src/tracking/` imports at module scope were
+declared nowhere at all:
+
+| Package | Imported by |
+|---|---|
+| pandas | 5 files in `src/tracking/` |
+| openpyxl | 4 files in `src/tracking/` |
+| tqdm | 3 files in `src/tracking/` |
+| psutil | `src/tracking/historical_accuracy.py` |
+| spacetrack | `src/tracking/spacetrack_client.py` |
+
+The Satellite Visibility Tool works on the workstation because that
+environment happens to have them installed. Nothing declares them, so
+nothing would reinstall them.
 
 **Why this matters more than a tidy-up.** Every one of the five
 workflows carries a paragraph explaining that it cannot use
@@ -103,6 +121,42 @@ hand-maintained install lists, and they have already drifted:
 Nothing verifies that any of these matches what the code imports. A
 missing package fails at runtime in a scheduled job — which is the
 failure mode this project has the worst history with.
+
+### Resolved, 2026-09-10
+
+Split into four files by what needs them:
+
+| File | Contents | Installed by |
+|---|---|---|
+| `requirements.txt` | requests, sgp4, skyfield, numpy, sqlalchemy, psycopg2-binary, python-dotenv | all five scheduled workflows, and CI |
+| `requirements-imagery.txt` | rasterio | nothing yet — GIS work is deferred |
+| `requirements-tracking.txt` | pandas, openpyxl, tqdm, psutil, spacetrack | the workstation tool |
+| `requirements-dev.txt` | pytest, ruff, mypy | CI |
+
+All six workflows now install `-r requirements.txt` (CI adds
+`-r requirements-dev.txt`) and their headers explaining why they could
+not have been corrected. Six hand-maintained lists became one.
+
+Measured rather than assumed: a cold install of the core file takes
+**9 seconds**, against 4 seconds for the shortest of the lists it
+replaces. The extra 5 seconds per run is the whole cost of removing the
+drift. Every package resolves to a wheel; nothing needs system
+libraries.
+
+`tests/test_requirements.py` now enforces it in both directions —
+every third-party import must be declared, every declared package must
+be imported, and anything reachable from a scheduled workflow must be in
+the *core* file specifically. The test was verified against a synthetic
+repository to confirm it fails on each of those conditions rather than
+passing vacuously, including on a file carrying a UTF-8 BOM, which
+`ast.parse` rejects unless the source is read as `utf-8-sig` — two check
+scripts in this repository have one.
+
+One import cannot be expressed in any requirements file: `src/resources.py`
+puts `D:\Projects\WIT` on `sys.path` and imports `wit` from it. That is
+named explicitly in the test with its own guard against a second one
+appearing, rather than being quietly exempted. It remains an open
+decision below.
 
 ---
 
@@ -158,13 +212,13 @@ worth keeping while the WIT question is open.
 
 ## 6. Recommended order
 
-1. **Fix `requirements.txt`** — remove the nine unimported packages.
-   Cheap, reversible, and it removes the justification for five
-   divergent install lists.
-2. **Add a test that the workflow install lists cover what the code
-   imports.** This is the guard that does not exist, and its absence is
-   the highest-risk item here: a scheduled job that cannot import
-   something fails unattended.
+1. ~~**Fix `requirements.txt`**~~ — done 2026-09-10; see §3. It removed
+   the justification for five divergent install lists, and they are gone
+   with it.
+2. ~~**Add a test that the install lists cover what the code imports.**~~
+   — done 2026-09-10; `tests/test_requirements.py`. This was the highest
+   risk item here, because a scheduled job that cannot import something
+   fails unattended.
 3. **Delete `check2.py`.**
 4. **Decide on WIT** — in the plan and made explicit, or out.
 5. **Resolve the `src/tracking/` fork** — port the hardening to the
