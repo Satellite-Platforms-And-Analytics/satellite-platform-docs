@@ -88,21 +88,45 @@ described in §1, not a problem with this workflow.
 
 ---
 
-## 3. The monitor's silence is still unverified
+## 3. The monitor's filter works; its silence is still unproven
 
-`report_events.py --only-newsworthy` was added specifically so the monitor
-stops opening an issue on days when nothing happened. It has not yet had a
-scheduled run.
+`report_events.py --only-newsworthy` was added so the monitor stops
+opening an issue on days when nothing happened.
 
-Issue **#10** (2026-09-09 12:22 UTC) is the exact case the fix exists to
-suppress — "2 new catalogue event(s) in the last 24h, **0 notable**", both
-of them `latency_regression` and `uncatalogued_growth`, both in
-`ROUTINE_TYPES`. It was opened *before* the fix landed. Issues #7, #8 and
-#9 are the same shape.
+At the time of the audit it was untested, and the failure condition was
+written down as: *if it opens an issue with 0 notable events, the fix
+does not work.* It has now run, and the answer is neither of the two
+outcomes that were anticipated.
 
-So the design is untested in production. The next `monitor_catalog` run is
-the test: **if it opens issue #11 with 0 notable events, the fix does not
-work.** This is the single most useful thing to watch over the next day.
+**It opened issue #11 on 2026-09-10 — correctly.** The digest reads *"5
+new catalogue event(s) in the last 24h, 1 notable"* and carries a **New
+launches** section: launch `2026-203`, 6 PAYLOAD objects, launched
+2026-09-05, first seen 2026-09-07. `new_launch` is not in `ROUTINE_TYPES`,
+so `is_newsworthy()` returned True and the issue was right to exist. The
+filter let through exactly what it is supposed to let through.
+
+So the mechanism is verified in one direction only. Suppression — the
+zero-byte `--out` file that makes the workflow's `[ -s digest.md ]` gate
+fail, and no issue appear — has still never happened in production,
+because there has not yet been a day with nothing but routine metrics on
+it. Issues #7 through #10 all predate the fix; #11 postdates it and had
+real news. **The next quiet day is the test**, and it is worth watching
+for rather than assuming.
+
+For the record, the earlier framing was wrong: "#11 exists" was treated
+as the failure signal, when the failure signal was always "#11 exists
+*and* reports nothing but routine metrics". Only the body distinguishes
+them.
+
+### A smaller thing the digest shows
+
+Both routine sections list two near-identical bullets — *mean 5.7 days /
+226 objects* beside *mean 5.8 days / 221 objects*, and *579 uncatalogued
+(+2)* beside *577 (+1)*. That is not a bug: `event_key` for these is
+`latency:{today}` and `uncatalogued:{today}`, one row per day, and a 24h
+window straddles two of them. It reads as duplication to anyone skimming
+the issue. Worth collapsing to the newest row per routine type if the
+digest is ever cleaned up; not worth a change on its own.
 
 ---
 
@@ -216,4 +240,13 @@ The one surprise that needs no fixing is §1: sub-daily schedules deliver
 at roughly a quarter of their nominal rate, and every consumer that
 depends on them tolerates it. Worth having established rather than hoped.
 
-The one thing still unproven is the monitor's ability to stay quiet.
+The one thing still unproven is the monitor's ability to stay quiet. Its
+filter is now half-verified: on 2026-09-10 it correctly let a genuine new
+launch through (§3). Suppression on a quiet day has not been observed
+yet, because there has not been one.
+
+Worth recording separately: that same issue is the first time the
+new-launch detection has reported a launch in a digest — `2026-203`, six
+payloads, first seen two days after launch. That was the capability the
+whole Phase 2 monitoring effort was asked for, and it works end to end
+without anyone running anything by hand.
