@@ -171,8 +171,9 @@ project rather than dropped. Keep.
 
 **`src/resources.py` (~380 lines)** — reads TLE sources, tracking
 databases and launch providers from WIT, a separate project at
-`D:\Projects\WIT`. Nothing in the pipeline imports it; only two root
-diagnostics do. It plausibly feeds the launch-platforms and industry
+`D:\Projects\WIT`. Nothing in the pipeline imports it. Its consumers, in
+full: `check2.py` (deleted 2026-09-11), `check_resources.py`,
+`verify_paths.py`, and `tests/test_taxonomy_validation.py`. It plausibly feeds the launch-platforms and industry
 domains named as main effort.
 
 **This one needs a decision rather than an assumption.** It is the only

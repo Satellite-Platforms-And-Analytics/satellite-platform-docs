@@ -36,6 +36,15 @@ what they ask for. There is no partial credit in between — asking hourly
 does not buy a job that runs every two hours instead, it buys one that
 runs every four.
 
+One thing the gap measurement hides, visible only once the slot is
+compared against the landing time: **every daily job runs about five
+hours after the minute its cron asks for.** `ingest_visibility` asks
+06:43 and lands ~11:48; `monitor_catalog` asks 07:19 and lands ~12:15;
+`enrich_catalog` asks 06:55 and landed 11:52. The gap between runs is a
+clean 24h, so nothing is dropped - but the offset is real and consistent.
+Anyone waiting for the monitor's issue at 07:19 UTC will conclude it
+failed, four hours before it runs.
+
 The practical cadences, as opposed to the configured ones:
 
 - Propagation: median every **3.8 hours**, worst observed 6.1h — not hourly.
@@ -65,14 +74,17 @@ hourly should say "nominally hourly; observed ~4h".
 
 ---
 
-## 2. `enrich_catalog` has never run — correctly
+## 2. `enrich_catalog` — first run confirmed
 
-It has zero runs, which looked alarming and is not. The workflow was
-committed at **2026-09-10 02:37 UTC** (`f75f9c8`); its first scheduled
-firing is 06:55 UTC the same day, which had not yet happened when this
-audit ran (04:05 UTC). Nothing is wrong. It becomes a real finding only if
-it is still empty after 06:55 UTC — and given §1, allow it a few days
-before concluding the schedule never took.
+At the time of the audit it had zero runs, which looked alarming and was
+not: the workflow was committed at **2026-09-10 02:37 UTC** (`f75f9c8`)
+and its first scheduled firing was 06:55 UTC the same day, which had not
+yet happened when the audit ran (04:05 UTC).
+
+**Resolved.** It fired once, at **2026-09-10 11:52 UTC**, and succeeded —
+its only run, so the schedule took on the first attempt. The five-hour
+offset between the 06:55 slot and the 11:52 landing is the pattern
+described in §1, not a problem with this workflow.
 
 ---
 
