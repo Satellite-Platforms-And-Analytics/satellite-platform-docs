@@ -171,6 +171,32 @@ write failure would surface precisely at that step and nowhere earlier.
 Treat as resolved. If it recurs, get a token first — inference is not a
 log.
 
+### Confirmed from the data, 2026-09-11
+
+The inference above turned out to be checkable without the logs. Row
+counts per day in `tle_history`, surfaced by `archive_to_local.py
+--status`:
+
+| Date | Element sets ingested |
+|---|---|
+| 2026-09-01 | 22,950 |
+| **2026-09-02** | **361** |
+| **2026-09-03** | **7,806** |
+| 2026-09-04 | 44,655 |
+| 2026-09-05 | 42,280 |
+
+Against a 20,000–47,000 daily norm, those two days are down roughly
+**50,000 element sets** — and they are precisely the days the failing runs
+span. The write step was failing, so nothing was written; the data says so
+as plainly as a log would have.
+
+**This gap is permanent.** CelesTrak serves current elements only, and
+Space-Track's GP_History is one request per lifetime, so those sets cannot
+be backfilled at any sensible cost. Anything that scores confidence
+against historical elements will be thin across 2–3 September. That is
+worth knowing now rather than meeting it later as an unexplained dip in a
+model.
+
 ---
 
 ## 6. Two secret-exposure gaps found and closed
